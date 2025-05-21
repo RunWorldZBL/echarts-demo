@@ -1,7 +1,7 @@
 <template>
   <div class="detection-demo">
     <div class="road-view" ref="roadView">
-      <!-- Detection Boxes -->
+      <!-- 检测框 - 用于显示识别到的物体 -->
       <div
         v-for="(object, index) in detectedObjects"
         :key="index"
@@ -32,7 +32,119 @@
   </div>
 </template>
 <script setup>
-// import { ref, onMounted, onUnmounted } from 'vue' // Reference to road view elementconst roadView = ref(null)// Detected objects dataconst detectedObjects = ref([  {     type: 'car',     x: 150,     y: 120,     width: 120,     height: 70,     confidence: 0.92,    direction: 1 // direction of movement  },  {     type: 'car',     x: 350,     y: 150,     width: 100,     height: 60,     confidence: 0.88,    direction: -1  },  {     type: 'person',     x: 280,     y: 200,     width: 40,     height: 80,     confidence: 0.75,    direction: 1  },  {     type: 'person',     x: 120,     y: 220,     width: 30,     height: 70,     confidence: 0.81,    direction: -1  }])// Map objects (simplified representation of detected objects)const mapObjects = ref([])// Update map objects based on detected objectsfunction updateMapObjects() {  if (!roadView.value) return    const viewWidth = roadView.value.clientWidth  const viewHeight = roadView.value.clientHeight    mapObjects.value = detectedObjects.value.map(obj => {    // Convert road view coordinates to map coordinates (percentages)    return {      type: obj.type,      x: (obj.x / viewWidth) * 100,      y: (obj.y / viewHeight) * 100    }  })}// Animation interval IDlet animationInterval = null// Animate objects to simulate movementfunction animateObjects() {  detectedObjects.value.forEach(obj => {    // Move objects horizontally    obj.x += obj.direction * (obj.type === 'car' ? 2 : 1)        // Boundary check - reverse direction when hitting edges    if (roadView.value) {      const maxX = roadView.value.clientWidth - obj.width      if (obj.x > maxX) {        obj.x = maxX        obj.direction = -1      } else if (obj.x < 0) {        obj.x = 0        obj.direction = 1      }    }  })    // Update map objects  updateMapObjects()}onMounted(() => {  // Initialize map  updateMapObjects()    // Set up animation  animationInterval = setInterval(animateObjects, 50)    // Add resize listener to update map when window resizes  window.addEventListener('resize', updateMapObjects)})onUnmounted(() => {  // Clear animation interval  clearInterval(animationInterval)    // Remove resize listener  window.removeEventListener('resize', updateMapObjects)})
+import { ref, onMounted, onUnmounted, defineOptions } from 'vue'
+
+// 道路视图元素的引用，用于获取视图尺寸和处理事件
+const roadView = ref(null)
+
+// 检测到的物体数据，包含位置、尺寸、类型和置信度信息
+const detectedObjects = ref([
+  {
+    type: 'car',
+    x: 150,
+    y: 120,
+    width: 120,
+    height: 70,
+    confidence: 0.92,
+    direction: 1, // 移动方向：1表示向右，-1表示向左
+  },
+  {
+    type: 'car', // 物体类型：汽车
+    x: 350,
+    y: 150,
+    width: 100,
+    height: 60,
+    confidence: 0.88,
+    direction: -1, // 向左移动
+  },
+  {
+    type: 'person', // 物体类型：行人
+    x: 280,
+    y: 200,
+    width: 40,
+    height: 80,
+    confidence: 0.75,
+    direction: 1, // 向右移动
+  },
+  {
+    type: 'person', // 物体类型：行人
+    x: 120,
+    y: 220,
+    width: 30,
+    height: 70,
+    confidence: 0.81,
+    direction: -1, // 向左移动
+  },
+])
+
+// 地图对象数据 - 检测物体在地图上的简化表示
+const mapObjects = ref([])
+
+// 根据检测到的物体更新地图对象
+// 将道路视图中的像素坐标转换为地图中的百分比坐标
+function updateMapObjects() {
+  // 如果道路视图引用不存在，则直接返回
+  if (!roadView.value) return
+
+  // 获取道路视图的尺寸
+  const viewWidth = roadView.value.clientWidth
+  const viewHeight = roadView.value.clientHeight
+
+  // 遍历所有检测物体，转换坐标系统
+  mapObjects.value = detectedObjects.value.map((obj) => {
+    // 将像素坐标转换为地图上的百分比坐标
+    // 这样可以在不同屏幕尺寸上保持一致的显示效果
+    return {
+      type: obj.type, // 保留物体类型
+      x: (obj.x / viewWidth) * 100, // 转换为宽度百分比
+      y: (obj.y / viewHeight) * 100, // 转换为高度百分比
+    }
+  })
+}
+
+// 动画定时器ID，用于在组件卸载时清除
+let animationInterval = null
+
+// 模拟物体移动动画
+// 根据物体类型和方向更新位置，并在碰到边缘时改变方向
+function animateObjects() {
+  detectedObjects.value.forEach((obj) => {
+    // 根据物体类型和方向更新水平位置
+    // 汽车移动速度是行人的2倍
+    obj.x += obj.direction * (obj.type === 'car' ? 2 : 1)
+
+    // 边界检测 - 当碰到视图边缘时改变方向
+    if (roadView.value) {
+      // 计算视图右边界位置（考虑物体宽度）
+      const maxX = roadView.value.clientWidth - obj.width
+      if (obj.x > maxX) {
+        // 到达右边界，位置修正并反向移动
+        obj.x = maxX
+        obj.direction = -1
+      } else if (obj.x < 0) {
+        // 到达左边界，位置修正并反向移动
+        obj.x = 0
+        obj.direction = 1
+      }
+    }
+  })
+
+  // 位置更新后，同步更新地图上的物体位置
+  updateMapObjects()
+}
+
+onMounted(() => {
+  updateMapObjects()
+
+  animationInterval = setInterval(animateObjects, 50)
+
+  window.addEventListener('resize', updateMapObjects)
+})
+
+onUnmounted(() => {
+  clearInterval(animationInterval)
+  window.removeEventListener('resize', updateMapObjects)
+})
 defineOptions({
   name: 'auto-a',
 })
