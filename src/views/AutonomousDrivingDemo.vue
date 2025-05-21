@@ -68,8 +68,8 @@ const detectedObjects = ref([
     type: '高速无人机',
     x: 350,
     y: 150,
-    width: 100,
-    height: 60,
+    width: 120,
+    height: 70,
     confidence: 0.88,
     direction: -1,
     latlng: [31.2314, 121.4747],
@@ -78,8 +78,8 @@ const detectedObjects = ref([
     type: '低速无人机',
     x: 280,
     y: 200,
-    width: 40,
-    height: 80,
+    width: 120,
+    height: 70,
     confidence: 0.75,
     direction: 1,
     latlng: [31.2294, 121.4757],
@@ -88,7 +88,7 @@ const detectedObjects = ref([
     type: '低速无人机',
     x: 120,
     y: 220,
-    width: 30,
+    width: 120,
     height: 70,
     confidence: 0.81,
     direction: -1,
@@ -139,6 +139,11 @@ async function isOnRoad() {
 
 // 检查点是否在边界内
 function isInBoundary(latlng) {
+  // latlng[0] 是纬度，latlng[1] 是经度
+  // BOUNDARY.southWest[0] 是西南角的纬度，BOUNDARY.southWest[1] 是西南角的经度
+  // BOUNDARY.northEast[0] 是东北角的纬度，BOUNDARY.northEast[1] 是东北角的经度
+  // 检查点是否在边界内
+  // 如果点在边界内，则返回 true，否则返回 false
   return (
     latlng[0] >= BOUNDARY.southWest[0] &&
     latlng[0] <= BOUNDARY.northEast[0] &&
@@ -230,11 +235,15 @@ onMounted(() => {
     zoomControl: false,
   })
 
-  // 添加地图切片图层
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
-    maxZoom: 19,
-  }).addTo(map)
+  // 添加高德地图切片图层
+  L.tileLayer(
+    'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+    {
+      attribution: '© 高德地图',
+      maxZoom: 19,
+      subdomains: '1234',
+    },
+  ).addTo(map)
 
   // 初始化标记
   initializeMarkers()
