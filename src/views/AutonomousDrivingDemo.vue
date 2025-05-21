@@ -55,7 +55,7 @@ const BOUNDARY = {
 // 检测到的物体数据，包含位置、尺寸、类型和置信度信息
 const detectedObjects = ref([
   {
-    type: 'car',
+    type: '高速无人机',
     x: 150,
     y: 120,
     width: 120,
@@ -65,7 +65,7 @@ const detectedObjects = ref([
     latlng: [31.2304, 121.4737],
   },
   {
-    type: 'car',
+    type: '高速无人机',
     x: 350,
     y: 150,
     width: 100,
@@ -75,7 +75,7 @@ const detectedObjects = ref([
     latlng: [31.2314, 121.4747],
   },
   {
-    type: 'person',
+    type: '低速无人机',
     x: 280,
     y: 200,
     width: 40,
@@ -85,7 +85,7 @@ const detectedObjects = ref([
     latlng: [31.2294, 121.4757],
   },
   {
-    type: 'person',
+    type: '低速无人机',
     x: 120,
     y: 220,
     width: 30,
@@ -180,11 +180,11 @@ async function animateObjects() {
 
 // 创建自定义图标
 function createIcon(type) {
-  const color = type === 'car' ? '#42b983' : '#f59e42'
+  const color = type === '高速无人机' ? '#42b983' : '#f59e42'
   return L.divIcon({
     className: `detection-marker ${type}`,
     html: `<div style="background-color: ${color}"></div>`,
-    iconSize: type === 'car' ? [24, 24] : [16, 16],
+    iconSize: type === '高速无人机' ? [24, 24] : [16, 16],
   })
 }
 
@@ -305,18 +305,18 @@ defineOptions({
   margin-top: -20px;
   white-space: nowrap;
 }
-.car {
+.高速无人机 {
   border-color: #42b983;
   background-color: rgba(66, 185, 131, 0.2);
 }
-.car .label {
+.高速无人机 .label {
   background-color: #42b983;
 }
-.person {
+.低速无人机 {
   border-color: #f59e42;
   background-color: rgba(245, 158, 66, 0.2);
 }
-.person .label {
+.低速无人机 .label {
   background-color: #f59e42;
 }
 .map-container {
@@ -352,10 +352,10 @@ defineOptions({
   border-radius: 50%;
   transform: translate(-50%, -50%);
 }
-.map-object.car {
+.map-object.高速无人机 {
   background-color: #42b983;
 }
-.map-object.person {
+.map-object.低速无人机 {
   background-color: #f59e42;
 }
 
@@ -382,11 +382,11 @@ defineOptions({
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-.detection-marker.car div {
+.detection-marker.高速无人机 div {
   background-color: rgba(66, 185, 131, 0.7);
 }
 
-.detection-marker.person div {
+.detection-marker.低速无人机 div {
   background-color: rgba(245, 158, 66, 0.7);
 }
 

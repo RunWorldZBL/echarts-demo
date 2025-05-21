@@ -26,14 +26,9 @@ const selectList = ref([
     path: '/echarts',
   },
   {
-    title: '自动驾驶',
+    title: '无人机监测',
     name: 'auto-a',
     path: '/auto',
-  },
-  {
-    title: '卫星地图',
-    name: 'satellite-map',
-    path: '/satellite-map',
   },
 ])
 const selected = ref('')
