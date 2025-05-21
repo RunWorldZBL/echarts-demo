@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import echarts from '../views/echarts.vue'
 import AutonomousDrivingDemo from '@/views/AutonomousDrivingDemo.vue'
-
+import SatelliteMap from '@/views/satellite-map/satellite-map.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -18,6 +18,11 @@ const router = createRouter({
       path: '/auto',
       name: 'auto-a',
       component: AutonomousDrivingDemo,
+    },
+    {
+      path: '/satellite-map',
+      name: 'satellite-map',
+      component: SatelliteMap,
     },
   ],
 })

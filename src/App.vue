@@ -10,14 +10,15 @@
 </template>
 
 <script setup>
-import { defineOptions, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineOptions, ref, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 defineOptions({
   name: 'App',
 })
 
 const router = useRouter()
+const route = useRoute()
 const selectList = ref([
   {
     title: '图表',
@@ -29,11 +30,32 @@ const selectList = ref([
     name: 'auto-a',
     path: '/auto',
   },
+  {
+    title: '卫星地图',
+    name: 'satellite-map',
+    path: '/satellite-map',
+  },
 ])
-const selected = ref(selectList.value[0].path)
+const selected = ref('')
 
+// 初始化时设置 selected
+onMounted(() => {
+  selected.value = route.path
+})
+
+// 监听路由变化，动态更新 selected
+watch(
+  () => route.path,
+  (val) => {
+    selected.value = val
+  },
+)
+
+// 监听 select 变化，跳转路由
 watch(selected, (val) => {
-  router.push(val)
+  if (val !== route.path) {
+    router.push(val)
+  }
 })
 </script>
 
