@@ -1,6 +1,8 @@
 <template>
   <div class="detection-demo">
     <div class="road-view" ref="roadView">
+      <!-- 地图容器 -->
+      <div id="map" class="map-view"></div>
       <!-- 检测框 - 用于显示识别到的物体 -->
       <div
         v-for="(object, index) in detectedObjects"
@@ -33,9 +35,22 @@
 </template>
 <script setup>
 import { ref, onMounted, onUnmounted, defineOptions } from 'vue'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
 
 // 道路视图元素的引用，用于获取视图尺寸和处理事件
 const roadView = ref(null)
+let map = null
+let markers = [] // 存储所有标记点
+let boundaryRect = null // 边界矩形
+let centerMarker = null // 中心标记点
+
+// 定义检测区域的边界（以上海某个区域为例）
+const BOUNDARY = {
+  northEast: [31.2354, 121.4787], // 东北角
+  southWest: [31.2254, 121.4687], // 西南角
+  center: [31.2304, 121.4737], // 中心点
+}
 
 // 检测到的物体数据，包含位置、尺寸、类型和置信度信息
 const detectedObjects = ref([
@@ -46,37 +61,40 @@ const detectedObjects = ref([
     width: 120,
     height: 70,
     confidence: 0.92,
-    direction: 1, // 移动方向：1表示向右，-1表示向左
+    direction: 1,
+    latlng: [31.2304, 121.4737],
   },
   {
-    type: 'car', // 物体类型：汽车
+    type: 'car',
     x: 350,
     y: 150,
     width: 100,
     height: 60,
     confidence: 0.88,
-    direction: -1, // 向左移动
+    direction: -1,
+    latlng: [31.2314, 121.4747],
   },
   {
-    type: 'person', // 物体类型：行人
+    type: 'person',
     x: 280,
     y: 200,
     width: 40,
     height: 80,
     confidence: 0.75,
-    direction: 1, // 向右移动
+    direction: 1,
+    latlng: [31.2294, 121.4757],
   },
   {
-    type: 'person', // 物体类型：行人
+    type: 'person',
     x: 120,
     y: 220,
     width: 30,
     height: 70,
     confidence: 0.81,
-    direction: -1, // 向左移动
+    direction: -1,
+    latlng: [31.2284, 121.4727],
   },
 ])
-
 // 地图对象数据 - 检测物体在地图上的简化表示
 const mapObjects = ref([])
 
@@ -105,46 +123,142 @@ function updateMapObjects() {
 // 动画定时器ID，用于在组件卸载时清除
 let animationInterval = null
 
+// 将地理坐标转换为屏幕坐标
+function geoToScreen(latlng) {
+  if (!map) return null
+  const point = map.latLngToContainerPoint(L.latLng(latlng))
+  return { x: point.x, y: point.y }
+}
+
+// 检查点是否在道路上
+async function isOnRoad() {
+  // 这里可以使用 Overpass API 或其他地图服务来检查点是否在道路上
+  // 现在先返回 true，后续可以添加实际的道路检查逻辑
+  return true
+}
+
+// 检查点是否在边界内
+function isInBoundary(latlng) {
+  return (
+    latlng[0] >= BOUNDARY.southWest[0] &&
+    latlng[0] <= BOUNDARY.northEast[0] &&
+    latlng[1] >= BOUNDARY.southWest[1] &&
+    latlng[1] <= BOUNDARY.northEast[1]
+  )
+}
+
 // 模拟物体移动动画
-// 根据物体类型和方向更新位置，并在碰到边缘时改变方向
-function animateObjects() {
-  detectedObjects.value.forEach((obj) => {
-    // 根据物体类型和方向更新水平位置
-    // 汽车移动速度是行人的2倍
-    obj.x += obj.direction * (obj.type === 'car' ? 2 : 1)
+async function animateObjects() {
+  for (let i = 0; i < detectedObjects.value.length; i++) {
+    const obj = detectedObjects.value[i]
+    const marker = markers[i]
 
-    // 边界检测 - 当碰到视图边缘时改变方向
-    if (roadView.value) {
-      // 计算视图右边界位置（考虑物体宽度）
-      const maxX = roadView.value.clientWidth - obj.width
-      if (obj.x > maxX) {
-        // 到达右边界，位置修正并反向移动
-        obj.x = maxX
-        obj.direction = -1
-      } else if (obj.x < 0) {
-        // 到达左边界，位置修正并反向移动
-        obj.x = 0
-        obj.direction = 1
+    // 计算新的地理位置
+    const latOffset = obj.direction * (obj.type === 'car' ? 0.0001 : 0.00005)
+    const lngOffset = obj.direction * (obj.type === 'car' ? 0.00015 : 0.000075)
+    const newLatlng = [obj.latlng[0] + latOffset, obj.latlng[1] + lngOffset]
+
+    // 检查新位置是否在边界内
+    if (isInBoundary(newLatlng) && (await isOnRoad())) {
+      obj.latlng = newLatlng
+      marker.setLatLng(newLatlng)
+
+      // 更新屏幕坐标
+      const screenPos = geoToScreen(newLatlng)
+      if (screenPos) {
+        obj.x = screenPos.x
+        obj.y = screenPos.y
       }
+    } else {
+      // 如果超出边界，改变方向
+      obj.direction *= -1
     }
-  })
+  }
 
-  // 位置更新后，同步更新地图上的物体位置
   updateMapObjects()
 }
 
+// 创建自定义图标
+function createIcon(type) {
+  const color = type === 'car' ? '#42b983' : '#f59e42'
+  return L.divIcon({
+    className: `detection-marker ${type}`,
+    html: `<div style="background-color: ${color}"></div>`,
+    iconSize: type === 'car' ? [24, 24] : [16, 16],
+  })
+}
+
+// 初始化地图标记
+function initializeMarkers() {
+  // 清除现有标记
+  markers.forEach((marker) => marker.remove())
+  markers = []
+
+  // 为每个检测对象创建标记
+  detectedObjects.value.forEach((obj) => {
+    const marker = L.marker(obj.latlng, {
+      icon: createIcon(obj.type),
+    }).addTo(map)
+    markers.push(marker)
+  })
+
+  // 添加中心标记
+  if (centerMarker) centerMarker.remove()
+  centerMarker = L.marker(BOUNDARY.center, {
+    icon: L.divIcon({
+      className: 'center-marker',
+      html: '<div></div>',
+      iconSize: [32, 32],
+    }),
+  }).addTo(map)
+
+  // 添加边界矩形
+  if (boundaryRect) boundaryRect.remove()
+  boundaryRect = L.rectangle([BOUNDARY.southWest, BOUNDARY.northEast], {
+    color: '#42b983',
+    weight: 2,
+    fillColor: '#42b983',
+    fillOpacity: 0.1,
+  }).addTo(map)
+}
+
 onMounted(() => {
+  // 初始化地图
+  map = L.map('map', {
+    center: BOUNDARY.center,
+    zoom: 16,
+    zoomControl: false,
+  })
+
+  // 添加地图切片图层
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 19,
+  }).addTo(map)
+
+  // 初始化标记
+  initializeMarkers()
+
+  // 设置地图边界
+  map.setMaxBounds([
+    [BOUNDARY.southWest[0] - 0.01, BOUNDARY.southWest[1] - 0.01],
+    [BOUNDARY.northEast[0] + 0.01, BOUNDARY.northEast[1] + 0.01],
+  ])
+
   updateMapObjects()
-
   animationInterval = setInterval(animateObjects, 50)
-
   window.addEventListener('resize', updateMapObjects)
 })
 
 onUnmounted(() => {
   clearInterval(animationInterval)
   window.removeEventListener('resize', updateMapObjects)
+  if (map) {
+    map.remove()
+    map = null
+  }
 })
+
 defineOptions({
   name: 'auto-a',
 })
@@ -160,27 +274,20 @@ defineOptions({
 .road-view {
   flex: 3;
   position: relative;
-  background-color: #333;
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3)),
-    linear-gradient(90deg, transparent 80%, #555 80%, #555 100%),
-    linear-gradient(90deg, #555 0%, #555 20%, transparent 20%),
-    linear-gradient(#fff 50%, transparent 50%);
-  background-size:
-    auto,
-    20%,
-    20%,
-    50px 10px;
-  background-position:
-    0 0,
-    0 0,
-    0 0,
-    center;
-  background-repeat: no-repeat, repeat-y, repeat-y, repeat-x;
   overflow: hidden;
+}
+
+.map-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 .detection-box {
   position: absolute;
+  z-index: 999;
   border: 2px solid;
   border-radius: 3px;
   box-sizing: border-box;
@@ -250,5 +357,66 @@ defineOptions({
 }
 .map-object.person {
   background-color: #f59e42;
+}
+
+/* 修复 Leaflet 图标问题 */
+.leaflet-default-icon-path {
+  background-image: url('https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png');
+}
+
+.leaflet-control-container .leaflet-control {
+  z-index: 3;
+}
+
+/* 自定义标记样式 */
+.detection-marker {
+  border: none;
+  background: none;
+}
+
+.detection-marker div {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
+.detection-marker.car div {
+  background-color: rgba(66, 185, 131, 0.7);
+}
+
+.detection-marker.person div {
+  background-color: rgba(245, 158, 66, 0.7);
+}
+
+.center-marker {
+  border: none;
+  background: none;
+}
+
+.center-marker div {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid #42b983;
+  box-shadow: 0 0 15px rgba(66, 185, 131, 0.5);
+  background-color: rgba(66, 185, 131, 0.2);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
 }
 </style>

@@ -30,7 +30,13 @@ const selectList = ref([
     path: '/auto',
   },
 ])
-const selected = ref(selectList.value[0].path)
+console.log(router.currentRoute.value.path)
+
+const selected = ref(
+  selectList.value.find((item) => {
+    return item.path === router.currentRoute.value.path
+  }),
+)
 
 watch(selected, (val) => {
   router.push(val)
