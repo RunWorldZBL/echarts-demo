@@ -107,7 +107,7 @@ function updateMapObjects() {
   // 获取道路视图的尺寸
   const viewWidth = roadView.value.clientWidth
   const viewHeight = roadView.value.clientHeight
-
+  console.log(boundaryRect)
   // 遍历所有检测物体，转换坐标系统
   mapObjects.value = detectedObjects.value.map((obj) => {
     // 将像素坐标转换为地图上的百分比坐标
@@ -137,18 +137,29 @@ async function isOnRoad() {
   return true
 }
 
-// 检查点是否在边界内
-function isInBoundary(latlng) {
-  // latlng[0] 是纬度，latlng[1] 是经度
-  // BOUNDARY.southWest[0] 是西南角的纬度，BOUNDARY.southWest[1] 是西南角的经度
-  // BOUNDARY.northEast[0] 是东北角的纬度，BOUNDARY.northEast[1] 是东北角的经度
-  // 检查点是否在边界内
-  // 如果点在边界内，则返回 true，否则返回 false
+// 检查点是否在边界内 - 考虑物体的宽度和高度
+function isInBoundary(latlng, obj) {
+  if (!boundaryRect || !map) return false
+
+  // 将地理坐标转换为屏幕坐标
+  const screenPos = geoToScreen(latlng)
+  if (!screenPos) return false
+
+  // 获取绿色矩形边界的屏幕坐标
+  const bounds = boundaryRect.getBounds()
+  const northEast = map.latLngToContainerPoint(bounds.getNorthEast())
+  const southWest = map.latLngToContainerPoint(bounds.getSouthWest())
+
+  // 计算边界矩形的宽度和高度
+  const rectWidth = northEast.x - southWest.x
+  const rectHeight = southWest.y - northEast.y
+
+  // 考虑物体的宽度和高度，确保物体的右下角也在边界内
   return (
-    latlng[0] >= BOUNDARY.southWest[0] &&
-    latlng[0] <= BOUNDARY.northEast[0] &&
-    latlng[1] >= BOUNDARY.southWest[1] &&
-    latlng[1] <= BOUNDARY.northEast[1]
+    screenPos.x >= southWest.x &&
+    screenPos.y >= northEast.y &&
+    screenPos.x + obj.width <= southWest.x + rectWidth &&
+    screenPos.y + obj.height <= northEast.y + rectHeight
   )
 }
 
@@ -158,24 +169,21 @@ async function animateObjects() {
     const obj = detectedObjects.value[i]
     const marker = markers[i]
 
-    // 计算新的地理位置
     const latOffset = obj.direction * (obj.type === 'car' ? 0.0001 : 0.00005)
     const lngOffset = obj.direction * (obj.type === 'car' ? 0.00015 : 0.000075)
     const newLatlng = [obj.latlng[0] + latOffset, obj.latlng[1] + lngOffset]
 
-    // 检查新位置是否在边界内
-    if (isInBoundary(newLatlng) && (await isOnRoad())) {
+    // 检查是否在地图视图边界中（考虑 obj 宽高）
+    if (isInBoundary(newLatlng, obj) && (await isOnRoad())) {
       obj.latlng = newLatlng
       marker.setLatLng(newLatlng)
 
-      // 更新屏幕坐标
       const screenPos = geoToScreen(newLatlng)
       if (screenPos) {
         obj.x = screenPos.x
         obj.y = screenPos.y
       }
     } else {
-      // 如果超出边界，改变方向
       obj.direction *= -1
     }
   }
@@ -227,6 +235,21 @@ function initializeMarkers() {
   }).addTo(map)
 }
 
+// 获取绿色矩形边界的宽度和高度
+function getRectangleDimensions() {
+  if (!boundaryRect || !map) return { width: 0, height: 0 }
+
+  const bounds = boundaryRect.getBounds()
+  const northEast = map.latLngToContainerPoint(bounds.getNorthEast())
+  const southWest = map.latLngToContainerPoint(bounds.getSouthWest())
+
+  const width = northEast.x - southWest.x
+  const height = southWest.y - northEast.y
+
+  console.log('绿色边界矩形尺寸:', { width, height, bounds })
+  return { width, height }
+}
+
 onMounted(() => {
   // 初始化地图
   map = L.map('map', {
@@ -247,6 +270,9 @@ onMounted(() => {
 
   // 初始化标记
   initializeMarkers()
+
+  // 获取绿色边界信息
+  getRectangleDimensions()
 
   // 设置地图边界
   map.setMaxBounds([
